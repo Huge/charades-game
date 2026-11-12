@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Charades</title>
+<meta name="description" content="A party charades game: movies, animals, actions, jobs, food, sports and famous people. One acts or describes, the rest guess before the timer runs out.">
+<meta name="theme-color" content="#0d0e1c">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎬</text></svg>">
+<style>
+:root{
+  --bg:#0d0e1c; --panel:#191b33; --line:#2e3260;
+  --ink:#f4f1e8; --muted:#a6a9c6;
+  --gold:#ffc940; --gold-ink:#241a00;
+  --ok:#2ecc7a; --ok-ink:#03200f;
+  --bad:#ff5d5d;
+  --card:#fff6df; --card-ink:#1a1630;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:radial-gradient(900px 520px at 50% -120px,#2c2f66 0%,transparent 70%),var(--bg);
+  background-attachment:fixed;
+  color:var(--ink);
+  font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%;
+}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;touch-action:manipulation}
+button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+#app{
+  min-height:100dvh;max-width:640px;margin:0 auto;display:flex;flex-direction:column;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+}
+.screen{flex:1;display:flex;flex-direction:column;gap:16px;min-height:0}
+
+/* shared */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  min-height:56px;padding:12px 20px;border-radius:16px;
+  font-weight:800;font-size:1.1rem;letter-spacing:.01em;
+  transition:transform .08s ease,filter .15s ease;
+}
+.btn:active{transform:scale(.97)}
+.btn.gold{background:var(--gold);color:var(--gold-ink)}
+.btn.ok{background:var(--ok);color:var(--ok-ink)}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--line)}
+.btn.big{min-height:84px;font-size:1.4rem}
+#startBtn{position:sticky;bottom:max(8px,env(safe-area-inset-bottom));z-index:2;box-shadow:0 0 0 10px var(--bg)}
+.link{color:var(--muted);text-decoration:underline;text-underline-offset:3px;padding:8px;align-self:center}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
+.label{font-size:.78rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.spacer{flex:1}
+
+/* home */
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:6px 14px;border-radius:999px;
+  font-weight:700;font-size:.9rem;color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line);
+}
+.pill[aria-pressed="true"]{color:var(--ink)}
+.marquee{
+  text-align:center;padding:22px 14px;border-radius:22px;
+  border:4px dotted var(--gold);
+  background:linear-gradient(180deg,#22254a,#171930);
+}
+.marquee h1{
+  margin:0;font-size:clamp(2rem,9vw,3.4rem);line-height:1.02;font-weight:900;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--gold);
+  text-shadow:0 0 22px rgba(255,201,64,.35);
+  text-wrap:balance;
+}
+.marquee p{margin:10px 0 0;color:var(--muted);text-wrap:balance}
+.how{margin:0;padding:0 0 0 1.25em;color:var(--muted);font-size:.95rem}
+.how li{margin:4px 0}
+.how li::marker{color:var(--gold);font-weight:800}
+.opts{display:flex;flex-direction:column;gap:16px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;background:#111328;border-radius:14px;padding:5px}
+.seg button{min-height:46px;border-radius:10px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.seg button[aria-checked="true"]{background:var(--gold);color:var(--gold-ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  min-height:44px;padding:8px 14px;border-radius:999px;font-weight:700;font-size:.95rem;
+  color:var(--muted);box-shadow:inset 0 0 0 1.5px var(--line);
+}
+.chip[aria-pressed="true"]{background:rgba(255,201,64,.14);color:var(--gold);box-shadow:inset 0 0 0 1.5px var(--gold)}
+.chip small{font-weight:600;opacity:.75;margin-left:4px}
+.note{color:var(--muted);font-size:.85rem;margin:8px 0 0}
+
+/* scoreboard */
+.board{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.board li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:#111328}
+.board li.now{box-shadow:inset 0 0 0 2px var(--gold)}
+.board .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.board .name{flex:1;font-weight:700}
+.board .pts{font-weight:900;font-size:1.25rem;font-variant-numeric:tabular-nums}
+
+/* ready */
+#ready{align-items:center;justify-content:center;text-align:center}
+#ready h2{margin:0;font-size:clamp(2.2rem,11vw,4rem);font-weight:900;color:var(--gold);line-height:1.05}
+#ready p{margin:0;color:var(--muted);max-width:26ch;font-size:1.1rem;text-wrap:balance}
+#ready .btn{min-width:min(100%,280px)}
+#count{font-size:clamp(7rem,40vw,13rem);font-weight:900;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* play */
+.bar{height:10px;border-radius:999px;background:#111328;overflow:hidden;flex:none}
+.bar i{display:block;height:100%;background:var(--gold);transform-origin:left;transition:transform .1s linear,background-color .3s}
+.hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;flex:none}
+.hud .got{font-weight:800;color:var(--ok);font-size:1.2rem;font-variant-numeric:tabular-nums}
+.hud .who{font-size:.8rem;color:var(--muted);font-weight:700;display:block}
+#clock{font-size:clamp(3.2rem,16vw,5rem);font-weight:900;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.hud .pause{justify-self:end;width:48px;height:48px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--line);font-size:1.1rem;color:var(--muted)}
+#play.low #clock{color:var(--bad)}
+#play.low .bar i{background:var(--bad)}
+.card{
+  flex:1;min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:var(--card);color:var(--card-ink);border-radius:26px;padding:24px 20px;text-align:center;
+  box-shadow:0 0 0 4px var(--bg),0 0 0 8px var(--gold),0 24px 60px rgba(0,0,0,.45);
+  margin:8px;
+}
+.card .kind{font-size:.75rem;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#8a7a52}
+#movie{
+  margin:0;font-size:clamp(1.9rem,8.5vw,3.6rem);line-height:1.08;font-weight:900;
+  text-wrap:balance;overflow-wrap:anywhere;
+}
+#movie.in{animation:pop .22s ease-out}
+.actions{display:grid;grid-template-columns:1fr 1.6fr;gap:12px;flex:none}
+#veil{
+  position:fixed;inset:0;z-index:5;background:rgba(13,14,28,.96);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;
+}
+#veil h2{margin:0 0 8px;font-size:2.2rem;font-weight:900}
+#veil .btn{width:min(100%,300px)}
+
+/* done */
+#done h2{margin:0;font-size:clamp(2rem,9vw,3rem);font-weight:900;color:var(--gold);text-align:center;line-height:1.1}
+.tally{text-align:center;font-size:1.3rem;font-weight:800;margin:0}
+.tally b{color:var(--ok);font-size:2.2rem;font-variant-numeric:tabular-nums;vertical-align:-.08em;margin-left:4px}
+.res{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.res button{
+  width:100%;display:flex;align-items:center;gap:12px;text-align:left;min-height:46px;padding:8px 12px;
+  border-radius:12px;background:#111328;font-weight:600;
+}
+.res .mark{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:900;font-size:.9rem;flex:none;background:#2a2d52;color:var(--muted)}
+.res .yes .mark{background:var(--ok);color:var(--ok-ink)}
+.res .no{color:var(--muted)}
+.row{display:grid;grid-template-columns:1fr 2fr;gap:12px}
+
+@keyframes pop{from{transform:scale(.92);opacity:0}to{transform:none;opacity:1}}
+@keyframes pulse{50%{transform:scale(1.08)}}
+#play.low #clock{animation:pulse 1s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){
+  #movie.in,#play.low #clock{animation:none}
+  .bar i,.btn{transition:none}
+}
+@media (orientation:landscape) and (max-height:480px){
+  .card{min-height:110px;padding:12px 16px;margin:4px 8px}
+  #movie{font-size:clamp(1.6rem,6vw,2.6rem)}
+  #clock{font-size:2.6rem}
+  .btn.big{min-height:60px}
+  .screen{gap:10px}
+}
+</style>
+</head>
+<body>
+<main id="app">
+
+  <!-- HOME -->
+  <section id="home" class="screen">
+    <div class="top">
+      <button class="pill" id="soundBtn" aria-pressed="true"></button>
+      <button class="pill" id="langBtn" aria-label="Language / Jazyk"></button>
+    </div>
+    <header class="marquee">
+      <h1 data-t="title"></h1>
+      <p data-t="tagline"></p>
+    </header>
+    <ol class="how">
+      <li data-t="how1"></li>
+      <li data-t="how2"></li>
+      <li data-t="how3"></li>
+    </ol>
+    <div class="panel opts">
+      <div>
+        <p class="label" id="lblTimer" data-t="timer"></p>
+        <div class="seg" id="timeSeg" role="radiogroup" aria-labelledby="lblTimer"></div>
+      </div>
+      <div>
+        <p class="label" id="lblTeams" data-t="teams"></p>
+        <div class="seg" id="teamSeg" role="radiogroup" aria-labelledby="lblTeams"></div>
+      </div>
+      <div>
+        <p class="label" data-t="decks"></p>
+        <div class="chips" id="deckChips"></div>
+        <p class="note" id="poolNote"></p>
+      </div>
+    </div>
+    <div class="panel" id="homeBoardWrap" hidden>
+      <p class="label" data-t="scores"></p>
+      <ul class="board" id="homeBoard"></ul>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn gold big" id="startBtn"></button>
+    <button class="link" id="resetBtn" data-t="reset" hidden></button>
+  </section>
+
+  <!-- READY -->
+  <section id="ready" class="screen" hidden>
+    <h2 id="readyTeam"></h2>
+    <p id="readyHint" data-t="readyHint"></p>
+    <div id="count" hidden aria-live="assertive"></div>
+    <button class="btn gold big" id="goBtn" data-t="go"></button>
+    <button class="link" id="backBtn" data-t="back"></button>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" class="screen" hidden>
+    <div class="bar"><i id="barFill"></i></div>
+    <div class="hud">
+      <div><span class="who" id="playWho"></span><span class="got">✓ <span id="gotN">0</span></span></div>
+      <div id="clock" role="timer">1:00</div>
+      <button class="pause" id="pauseBtn" aria-label="Pause">❚❚</button>
+    </div>
+    <div class="card">
+      <span class="kind" id="kind"></span>
+      <h2 id="movie" aria-live="polite"></h2>
+    </div>
+    <div class="actions">
+      <button class="btn ghost big" id="skipBtn" data-t="skip"></button>
+      <button class="btn ok big" id="okBtn" data-t="guessed"></button>
+    </div>
+    <div id="veil" hidden>
+      <h2 data-t="paused"></h2>
+      <button class="btn gold" id="resumeBtn" data-t="resume"></button>
+      <button class="btn ghost" id="endBtn" data-t="endRound"></button>
+    </div>
+  </section>
+
+  <!-- DONE -->
+  <section id="done" class="screen" hidden>
+    <h2 data-t="timeUp"></h2>
+    <p class="tally"><span id="doneWho"></span> <span data-t="roundScore"></span><b id="doneN">0</b></p>
+    <div class="panel">
+      <ul class="res" id="resList"></ul>
+      <p class="note" data-t="fixHint"></p>
+    </div>
+    <div class="panel" id="doneBoardWrap">
+      <p class="label" data-t="scores"></p>
+      <ul class="board" id="doneBoard"></ul>
+    </div>
+    <div class="spacer"></div>
+    <div class="row">
+      <button class="btn ghost" id="menuBtn" data-t="menu"></button>
+      <button class="btn gold" id="nextBtn"></button>
+    </div>
+  </section>
+
+  <noscript><p style="padding:24px;text-align:center">This game needs JavaScript. / Hra potřebuje JavaScript.</p></noscript>
+</main>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------- Movies: [English title, Czech title (omitted when identical)] ---------- */
+const HITS = [
+["The Shawshank Redemption","Vykoupení z věznice Shawshank"],["The Godfather","Kmotr"],["The Dark Knight","Temný rytíř"],
+["Pulp Fiction","Pulp Fiction: Historky z podsvětí"],["Forrest Gump"],["Inception","Počátek"],["Fight Club","Klub rváčů"],
+["The Matrix","Matrix"],["The Lord of the Rings","Pán prstenů"],["Star Wars","Hvězdné války"],["Titanic"],
+["Jurassic Park","Jurský park"],["Back to the Future","Návrat do budoucnosti"],["Avatar"],["Gladiator","Gladiátor"],
+["The Silence of the Lambs","Mlčení jehňátek"],["Jaws","Čelisti"],["Indiana Jones"],["The Terminator","Terminátor"],
+["Alien","Vetřelec"],["Rocky"],["Pirates of the Caribbean","Piráti z Karibiku"],["The Avengers","Avengers"],
+["Spider-Man"],["Iron Man"],["Batman"],["Joker"],["Interstellar"],["The Wolf of Wall Street","Vlk z Wall Street"],
+["Django Unchained","Nespoutaný Django"],["Kill Bill"],["Inglourious Basterds","Hanebný pancharti"],
+["The Green Mile","Zelená míle"],["Schindler's List","Schindlerův seznam"],["Saving Private Ryan","Zachraňte vojína Ryana"],
+["Braveheart","Statečné srdce"],["The Truman Show","Truman Show"],["The Sixth Sense","Šestý smysl"],["Se7en","Sedm"],
+["Léon: The Professional","Leon"],["Goodfellas","Mafiáni"],["Scarface","Zjizvená tvář"],["Casablanca"],["Psycho"],
+["The Shining","Osvícení"],["A Clockwork Orange","Mechanický pomeranč"],["2001: A Space Odyssey","2001: Vesmírná odysea"],
+["Blade Runner"],["Ghostbusters","Krotitelé duchů"],["Dirty Dancing","Hříšný tanec"],["Grease","Pomáda"],["Pretty Woman"],
+["Top Gun"],["Die Hard","Smrtonosná past"],["Lethal Weapon","Smrtonosná zbraň"],["Mission: Impossible"],["Skyfall"],
+["The Hunger Games","Hunger Games"],["Twilight","Stmívání"],["The Hangover","Pařba ve Vegas"],
+["American Pie","Prci, prci, prcičky"],["Bridget Jones's Diary","Deník Bridget Jonesové"],["Love Actually","Láska nebeská"],
+["Notting Hill"],["Mamma Mia!"],["La La Land"],["The Devil Wears Prada","Ďábel nosí Pradu"],["Mrs. Doubtfire","Táta v sukni"],
+["The Mask","Maska"],["Ace Ventura: Pet Detective","Ace Ventura: Zvířecí detektiv"],["Dumb and Dumber","Blbý a blbější"],
+["Men in Black","Muži v černém"],["Independence Day","Den nezávislosti"],["Armageddon"],["King Kong"],["Godzilla"],
+["Transformers"],["Fast & Furious","Rychle a zběsile"],["Mad Max: Fury Road","Šílený Max: Zběsilá cesta"],["John Wick"],
+["Taken","96 hodin"],["The Bourne Identity","Agent bez minulosti"],["Ocean's Eleven","Dannyho parťáci"],
+["Catch Me If You Can","Chyť mě, když to dokážeš"],["The Prestige","Dokonalý trik"],["Shutter Island","Prokletý ostrov"],
+["The Revenant","Revenant: Zmrtvýchvstání"],["Cast Away","Trosečník"],["Life of Pi","Pí a jeho život"],
+["Slumdog Millionaire","Milionář z chatrče"],["The Pianist","Pianista"],["A Beautiful Mind","Čistá duše"],
+["Good Will Hunting","Dobrý Will Hunting"],["Dead Poets Society","Společnost mrtvých básníků"],
+["One Flew Over the Cuckoo's Nest","Přelet nad kukaččím hnízdem"],["Amadeus"],["Rain Man"],
+["The Intouchables","Nedotknutelní"],["Amélie","Amélie z Montmartru"],["Life Is Beautiful","Život je krásný"],
+["Parasite","Parazit"],["Dune","Duna"],["Oppenheimer"],["Barbie"],["Black Panther"],
+["Guardians of the Galaxy","Strážci Galaxie"],["Deadpool"],["Wonder Woman"],["Superman"],["X-Men"],
+["The Exorcist","Vymítač ďábla"],["It","To"],["Scream","Vřískot"],["A Nightmare on Elm Street","Noční můra v Elm Street"],
+["The Blair Witch Project","Záhada Blair Witch"],["A Quiet Place","Tiché místo"],["Get Out","Uteč"],
+["Saw","Saw: Hra o přežití"],["Planet of the Apes","Planeta opic"],["Gravity","Gravitace"],["The Martian","Marťan"],
+["Apollo 13"],["Bohemian Rhapsody"],["The Greatest Showman","Největší showman"],["A Star Is Born","Zrodila se hvězda"],
+["The Great Gatsby","Velký Gatsby"],["The Big Lebowski","Big Lebowski"],["Trainspotting"],
+["Gone with the Wind","Jih proti Severu"],["Some Like It Hot","Někdo to rád horké"],
+["Breakfast at Tiffany's","Snídaně u Tiffanyho"],["The Sound of Music","Za zvuků hudby"],
+["Singin' in the Rain","Zpívání v dešti"],["Ben-Hur","Ben Hur"],["The Good, the Bad and the Ugly","Hodný, zlý a ošklivý"],
+["Once Upon a Time in the West","Tenkrát na Západě"],["The Bodyguard","Osobní strážce"],["Ghost","Duch"],
+["Sister Act","Sestra v akci"],["Speed","Nebezpečná rychlost"],["Twister"],["The Fifth Element","Pátý element"],
+["RoboCop"],["Predator","Predátor"],["Rambo"],["The Karate Kid","Karate Kid"],["Sherlock Holmes"],
+["The Da Vinci Code","Šifra mistra Leonarda"],["Knives Out","Na nože"],
+["Murder on the Orient Express","Vražda v Orient expresu"],["The Notebook","Zápisník jedné lásky"],
+["Fifty Shades of Grey","Padesát odstínů šedi"],["300","300: Bitva u Thermopyl"],["Troy","Troja"],
+["The Last Samurai","Poslední samuraj"],["Crouching Tiger, Hidden Dragon","Tygr a drak"],["The Mummy","Mumie"],
+["The Mask of Zorro","Zorro: Tajemná tvář"],["Robin Hood"],["Everything Everywhere All at Once","Všechno, všude, najednou"],
+["Borat"],["Mr. Bean's Holiday","Prázdniny pana Beana"],["Johnny English"],["Austin Powers"],
+["The Pink Panther","Růžový panter"],["Police Academy","Policejní akademie"],["The Naked Gun","Bláznivá střela"],
+["Airplane!","Připoutejte se, prosím!"],["Scary Movie","Scary Movie: Děsnej biják"],
+["Groundhog Day","Na Hromnice o den více"],["The Terminal","Terminál"],["Bruce Almighty","Božský Bruce"],
+["Liar Liar","Lhář, lhář"],["Meet the Parents","Fotr je lotr"],["School of Rock","Škola ro(c)ku"],
+["Legally Blonde","Pravá blondýnka"],["Mean Girls","Protivný sprostý holky"],
+["10 Things I Hate About You","Deset důvodů, proč tě nenávidím"],["When Harry Met Sally","Když Harry potkal Sally"],
+["Sleepless in Seattle","Samotář v Seattlu"],["You've Got Mail","Láska přes internet"],
+["Four Weddings and a Funeral","Čtyři svatby a jeden pohřeb"],["Me Before You","Než jsem tě poznala"],
+["The Fault in Our Stars","Hvězdy nám nepřály"],["Brokeback Mountain","Zkrocená hora"],
+["The Curious Case of Benjamin Button","Podivuhodný případ Benjamina Buttona"],["The Butterfly Effect","Osudový dotek"],
+["Memento"],["The Usual Suspects","Obvyklí podezřelí"],["Reservoir Dogs","Gauneři"],
+["No Country for Old Men","Tahle země není pro starý"],["The Departed","Skrytá identita"],["Taxi Driver","Taxikář"],
+["Apocalypse Now","Apokalypsa"],["Full Metal Jacket","Olověná vesta"],["Platoon","Četa"],
+["Black Hawk Down","Černý jestřáb sestřelen"],["Dunkirk","Dunkerk"],["1917"],["Pearl Harbor"],
+["The Imitation Game","Kód Enigmy"],["The King's Speech","Králova řeč"],["The Theory of Everything","Teorie všeho"],
+["12 Angry Men","Dvanáct rozhněvaných mužů"],["Citizen Kane","Občan Kane"],["Rear Window","Okno do dvora"],
+["The Birds","Ptáci"],["Modern Times","Moderní doba"],["The Great Dictator","Diktátor"],
+["Edward Scissorhands","Střihoruký Edward"],["Beetlejuice"],["Whiplash"]
+];
+
+const FAMILY = [
+["The Lion King","Lví král"],["Home Alone","Sám doma"],["Harry Potter"],["E.T. the Extra-Terrestrial","E.T. – Mimozemšťan"],
+["Toy Story","Toy Story: Příběh hraček"],["Finding Nemo","Hledá se Nemo"],["Shrek"],["Frozen","Ledové království"],
+["Spirited Away","Cesta do fantazie"],["Up","Vzhůru do oblak"],["WALL-E","VALL-I"],["Ratatouille"],
+["Monsters, Inc.","Příšerky s.r.o."],["The Incredibles","Úžasňákovi"],["Inside Out","V hlavě"],["Coco"],["Cars","Auta"],
+["Madagascar","Madagaskar"],["Ice Age","Doba ledová"],["Kung Fu Panda"],["How to Train Your Dragon","Jak vycvičit draka"],
+["Despicable Me","Já, padouch"],["Minions","Mimoni"],["Beauty and the Beast","Kráska a zvíře"],["Aladdin","Aladin"],
+["The Little Mermaid","Malá mořská víla"],["Snow White and the Seven Dwarfs","Sněhurka a sedm trpaslíků"],
+["Cinderella","Popelka"],["Bambi"],["The Jungle Book","Kniha džunglí"],["Mary Poppins"],
+["The Wizard of Oz","Čaroděj ze země Oz"],["Charlie and the Chocolate Factory","Karlík a továrna na čokoládu"],
+["The Addams Family","Addamsova rodina"],["Jumanji"],["Night at the Museum","Noc v muzeu"],
+["The Chronicles of Narnia","Letopisy Narnie"],["The Hobbit","Hobit"],["Gremlins"],
+["Honey, I Shrunk the Kids","Miláčku, zmenšil jsem děti"],["Beethoven"],["Free Willy","Zachraňte Willyho"],
+["Babe","Babe – galantní prasátko"],["101 Dalmatians","101 dalmatinů"],["Paddington"],["The Grinch","Grinch"],
+["The Nightmare Before Christmas","Ukradené Vánoce"],["Zootopia","Zootropolis: Město zvířat"],["Moana","Odvážná Vaiana"],
+["Tangled","Na vlásku"],["Encanto"],["Mulan","Legenda o Mulan"],["Pocahontas"],["Tarzan"],["Hercules","Herkules"],
+["Peter Pan","Petr Pan"],["Pinocchio"],["Dumbo"],["Alice in Wonderland","Alenka v říši divů"],
+["The Polar Express","Polární expres"],["Happy Feet"],["Rio"],["The Lego Movie","LEGO příběh"],["Sing","Zpívej"],
+["The Secret Life of Pets","Tajný život mazlíčků"],["Puss in Boots","Kocour v botách"],["Chicken Run","Slepičí úlet"],
+["Bee Movie","Pan Včelka"],["Big Hero 6","Velká šestka"],["Brave","Rebelka"],["Lilo & Stitch","Lilo a Stitch"],
+["Asterix & Obelix: Mission Cleopatra","Asterix a Obelix: Mise Kleopatra"],["Stuart Little","Myšák Stuart Little"],
+["Dr. Dolittle"],["Casper"],["Space Jam"],["The Super Mario Bros. Movie","Super Mario Bros. ve filmu"],
+["Sonic the Hedgehog","Ježek Sonic"],["Spider-Man: Into the Spider-Verse","Spider-Man: Paralelní světy"],["Wonka"]
+];
+
+const CZECH = [
+"Pelíšky","Kolja","Vesničko má středisková","Obecná škola","S tebou mě baví svět","Slunce, seno, jahody",
+"Tři oříšky pro Popelku","Pyšná princezna","Limonádový Joe","Marečku, podejte mi pero!","Jáchyme, hoď ho do stroje!",
+"Světáci","Samotáři","Účastníci zájezdu","Vratné lahve","Tmavomodrý svět","Želary","Jak vytrhnout velrybě stoličku",
+"Sněženky a machři","Dědictví aneb Kurvahošigutntág","Postřižiny","Na samotě u lesa","Ostře sledované vlaky",
+"Spalovač mrtvol","Adéla ještě nevečeřela","Císařův pekař – Pekařův císař","Byl jednou jeden král…","S čerty nejsou žerty",
+"Princezna se zlatou hvězdou","Anděl Páně","Tajemství hradu v Karpatech","Kulový blesk","Vrchní, prchni!","Knoflíkáři",
+"Kameňák","Bobule","Ženy v běhu","Vlastníci","Rafťáci","Snowboarďáci","Román pro ženy","Občanský průkaz",
+"Musíme si pomáhat","Hoří, má panenko","Černí baroni","Tankový prapor","Rozmarné léto","Ať žijí duchové!",
+"Dívka na koštěti","Lotrando a Zubejda","Šíleně smutná princezna","Jak utopit dr. Mráčka","Což takhle dát si špenát",
+"Pane, vy jste vdova!","Cesta do pravěku","Baron Prášil","Mrazík","Perinbaba","Jak svět přichází o básníky",
+"Slavnosti sněženek","Jára Cimrman ležící, spící","Jízda","Návrat idiota","Horem pádem","Pupendo","Babovřesky",
+"Po strništi bos","Teorie tygra","Zátopek","Bony a klid","Discopříběh","Jak se krotí krokodýli"
+];
+
+/* ---------- More categories ---------- */
+const ANIMALS = [
+["Dog","Pes"],["Cat","Kočka"],["Horse","Kůň"],["Cow","Kráva"],["Pig","Prase"],["Sheep","Ovce"],["Goat","Koza"],
+["Chicken","Slepice"],["Rooster","Kohout"],["Duck","Kachna"],["Goose","Husa"],["Turkey","Krocan"],["Rabbit","Králík"],
+["Mouse","Myš"],["Rat","Potkan"],["Hamster","Křeček"],["Guinea pig","Morče"],["Hedgehog","Ježek"],["Squirrel","Veverka"],
+["Fox","Liška"],["Wolf","Vlk"],["Bear","Medvěd"],["Deer","Jelen"],["Wild boar","Divočák"],["Bat","Netopýr"],["Owl","Sova"],
+["Eagle","Orel"],["Parrot","Papoušek"],["Penguin","Tučňák"],["Flamingo","Plameňák"],["Peacock","Páv"],["Pigeon","Holub"],
+["Swan","Labuť"],["Stork","Čáp"],["Woodpecker","Datel"],["Toucan","Tukan"],["Frog","Žába"],["Snake","Had"],
+["Turtle","Želva"],["Crocodile","Krokodýl"],["Lizard","Ještěrka"],["Chameleon","Chameleon"],["Shark","Žralok"],
+["Dolphin","Delfín"],["Whale","Velryba"],["Octopus","Chobotnice"],["Jellyfish","Medúza"],["Crab","Krab"],["Lobster","Humr"],
+["Seahorse","Mořský koník"],["Starfish","Hvězdice"],["Goldfish","Zlatá rybka"],["Seal","Tuleň"],["Walrus","Mrož"],
+["Lion","Lev"],["Tiger","Tygr"],["Leopard","Levhart"],["Cheetah","Gepard"],["Elephant","Slon"],["Giraffe","Žirafa"],
+["Zebra","Zebra"],["Hippo","Hroch"],["Rhino","Nosorožec"],["Monkey","Opice"],["Gorilla","Gorila"],["Kangaroo","Klokan"],
+["Koala","Koala"],["Panda","Panda"],["Sloth","Lenochod"],["Camel","Velbloud"],["Llama","Lama"],["Polar bear","Lední medvěd"],
+["Bull","Býk"],["Donkey","Osel"],["Otter","Vydra"],["Beaver","Bobr"],["Skunk","Skunk"],["Armadillo","Pásovec"],
+["Bee","Včela"],["Butterfly","Motýl"],["Spider","Pavouk"],["Ant","Mravenec"],["Snail","Šnek"],["Ladybug","Beruška"],
+["Mosquito","Komár"],["Dragonfly","Vážka"],["Scorpion","Štír"],["Worm","Žížala"],["Dinosaur","Dinosaurus"]
+];
+
+const ACTIONS = [
+["Brushing teeth","Čištění zubů"],["Taking a shower","Sprchování"],["Cooking dinner","Vaření večeře"],
+["Washing dishes","Mytí nádobí"],["Vacuuming","Luxování"],["Ironing clothes","Žehlení prádla"],["Making a bed","Ustýlání postele"],
+["Sleeping","Spaní"],["Snoring","Chrápání"],["Sneezing","Kýchání"],["Yawning","Zívání"],["Crying","Pláč"],["Laughing","Smích"],
+["Whispering","Šeptání"],["Singing in the shower","Zpěv ve sprše"],["Dancing","Tanec"],["Swimming","Plavání"],["Running","Běh"],
+["Jumping rope","Skákání přes švihadlo"],["Climbing a ladder","Šplhání po žebříku"],["Riding a bike","Jízda na kole"],
+["Driving a car","Řízení auta"],["Flying a plane","Pilotování letadla"],["Rowing a boat","Veslování"],["Fishing","Rybaření"],
+["Skiing","Lyžování"],["Ice skating","Bruslení"],["Surfing","Surfování"],["Mowing the lawn","Sekání trávy"],
+["Planting a tree","Sázení stromu"],["Painting a wall","Malování zdi"],["Hammering a nail","Zatloukání hřebíku"],
+["Sawing wood","Řezání dřeva"],["Digging a hole","Kopání díry"],["Chopping wood","Štípání dřeva"],
+["Playing guitar","Hra na kytaru"],["Playing the piano","Hra na klavír"],["Conducting an orchestra","Dirigování orchestru"],
+["Taking a selfie","Focení selfie"],["Texting","Psaní zpráv"],["Talking on the phone","Telefonování"],["Reading a book","Čtení knihy"],
+["Typing","Psaní na klávesnici"],["Writing a letter","Psaní dopisu"],["Shopping","Nakupování"],["Waiting in line","Stání ve frontě"],
+["Pushing a shopping cart","Tlačení nákupního vozíku"],["Opening a present","Rozbalování dárku"],
+["Blowing out candles","Sfoukávání svíček"],["Eating spaghetti","Jedení špaget"],["Drinking hot tea","Pití horkého čaje"],
+["Peeling a banana","Loupání banánu"],["Juggling","Žonglování"],["Doing yoga","Cvičení jógy"],["Lifting weights","Zvedání činek"],
+["Playing hide and seek","Hra na schovávanou"],["Building a snowman","Stavění sněhuláka"],
+["Throwing a snowball","Házení sněhových koulí"],["Walking a dog","Venčení psa"],["Feeding a baby","Krmení miminka"],
+["Changing a diaper","Přebalování miminka"],["Getting a haircut","Stříhání vlasů"],["Putting on makeup","Líčení"],
+["Tying shoelaces","Zavazování tkaniček"],["Parachuting","Skok padákem"],["Bungee jumping","Bungee jumping"],
+["Walking a tightrope","Chůze po laně"],["Sneaking","Plížení"],["Flexing muscles","Napínání svalů"],
+["Shivering from cold","Třesení se zimou"],["Sweating","Pocení"],["Hiccuping","Škytání"],["Waving goodbye","Mávání na rozloučenou"],
+["Hitchhiking","Stopování"],["Directing traffic","Řízení dopravy"],["Karaoke","Karaoke"],["Applauding","Potlesk"],
+["Proposing marriage","Žádost o ruku"],["Blowing bubbles","Foukání bublin"],["Applying sunscreen","Mazání opalovacím krémem"],
+["Roasting marshmallows","Opékání špekáčků"]
+];
+
+const JOBS = [
+["Doctor","Lékař"],["Nurse","Zdravotní sestra"],["Dentist","Zubař"],["Veterinarian","Veterinář"],["Surgeon","Chirurg"],
+["Psychologist","Psycholog"],["Teacher","Učitel"],["Police officer","Policista"],["Firefighter","Hasič"],["Pilot","Pilot"],
+["Flight attendant","Letuška"],["Astronaut","Astronaut"],["Chef","Šéfkuchař"],["Waiter","Číšník"],["Baker","Pekař"],
+["Butcher","Řezník"],["Farmer","Farmář"],["Fisherman","Rybář"],["Carpenter","Truhlář"],["Plumber","Instalatér"],
+["Electrician","Elektrikář"],["Mechanic","Automechanik"],["Construction worker","Stavební dělník"],["House painter","Malíř pokojů"],
+["Artist","Malíř"],["Sculptor","Sochař"],["Photographer","Fotograf"],["Musician","Hudebník"],["Conductor","Dirigent"],
+["Singer","Zpěvák"],["Actor","Herec"],["Magician","Kouzelník"],["Clown","Klaun"],["Circus acrobat","Cirkusový akrobat"],
+["Dancer","Tanečník"],["Barber","Holič"],["Hairdresser","Kadeřník"],["Tailor","Krejčí"],["Shoemaker","Švec"],
+["Cashier","Pokladní"],["Postman","Listonoš"],["Truck driver","Řidič kamionu"],["Bus driver","Řidič autobusu"],
+["Train conductor","Průvodčí"],["Sailor","Námořník"],["Captain","Kapitán"],["Lifeguard","Plavčík"],["Judge","Soudce"],
+["Lawyer","Právník"],["Politician","Politik"],["Journalist","Novinář"],["Scientist","Vědec"],["Programmer","Programátor"],
+["Librarian","Knihovník"],["Security guard","Hlídač"],["Soldier","Voják"],["Spy","Špion"],["Detective","Detektiv"],
+["Referee","Rozhodčí"],["Coach","Trenér"],["Zookeeper","Ošetřovatel zvířat"],["Beekeeper","Včelař"],["Gardener","Zahradník"],
+["Chimney sweep","Kominík"],["Window cleaner","Čistič oken"],["Miner","Horník"],["Blacksmith","Kovář"],["Cowboy","Kovboj"],
+["Pirate","Pirát"],["DJ","DJ"],["Fortune teller","Věštkyně"],["Bodyguard","Bodyguard"],["Garbage collector","Popelář"]
+];
+
+const FOOD = [
+["Pizza","Pizza"],["Hamburger","Hamburger"],["Hot dog","Hot dog"],["French fries","Hranolky"],["Spaghetti","Špagety"],
+["Sushi","Sushi"],["Taco","Taco"],["Sandwich","Sendvič"],["Pancakes","Palačinky"],["Omelette","Omeleta"],
+["Scrambled eggs","Míchaná vejce"],["Cereal","Cereálie"],["Toast","Toast"],["Soup","Polévka"],["Salad","Salát"],
+["Steak","Steak"],["Fried chicken","Smažené kuře"],["Schnitzel","Řízek"],["Goulash","Guláš"],["Dumplings","Knedlíky"],
+["Fried cheese","Smažený sýr"],["Potato salad","Bramborový salát"],["Sausage","Klobása"],["Bacon","Slanina"],["Ham","Šunka"],
+["Cheese","Sýr"],["Butter","Máslo"],["Bread","Chléb"],["Croissant","Croissant"],["Doughnut","Kobliha"],["Cake","Dort"],
+["Ice cream","Zmrzlina"],["Chocolate","Čokoláda"],["Cookie","Sušenka"],["Candy floss","Cukrová vata"],["Popcorn","Popcorn"],
+["Potato chips","Brambůrky"],["Pretzel","Preclík"],["Honey","Med"],["Jam","Džem"],["Peanut butter","Arašídové máslo"],
+["Apple","Jablko"],["Banana","Banán"],["Orange","Pomeranč"],["Watermelon","Meloun"],["Strawberry","Jahoda"],["Grapes","Hrozny"],
+["Pineapple","Ananas"],["Lemon","Citron"],["Cherry","Třešeň"],["Coconut","Kokos"],["Tomato","Rajče"],["Potato","Brambora"],
+["Carrot","Mrkev"],["Onion","Cibule"],["Garlic","Česnek"],["Corn","Kukuřice"],["Bell pepper","Paprika"],["Mushroom","Houba"],
+["Cucumber","Okurka"],["Broccoli","Brokolice"],["Pumpkin","Dýně"],["Coffee","Káva"],["Tea","Čaj"],["Beer","Pivo"],
+["Wine","Víno"],["Milk","Mléko"],["Orange juice","Pomerančový džus"],["Lemonade","Limonáda"],["Hot chocolate","Horká čokoláda"],
+["Smoothie","Smoothie"]
+];
+
+const SPORTS = [
+["Football (soccer)","Fotbal"],["Basketball","Basketbal"],["Volleyball","Volejbal"],["Tennis","Tenis"],
+["Table tennis","Stolní tenis"],["Badminton","Badminton"],["Golf","Golf"],["Baseball","Baseball"],
+["American football","Americký fotbal"],["Rugby","Ragby"],["Ice hockey","Lední hokej"],["Handball","Házená"],["Cricket","Kriket"],
+["Boxing","Box"],["Karate","Karate"],["Judo","Judo"],["Wrestling","Zápas"],["Fencing","Šerm"],["Archery","Lukostřelba"],
+["Diving","Skoky do vody"],["Water polo","Vodní pólo"],["Sailing","Plachtění"],["Snowboarding","Snowboarding"],
+["Figure skating","Krasobruslení"],["Curling","Curling"],["Biathlon","Biatlon"],["Cycling","Cyklistika"],
+["Skateboarding","Skateboarding"],["Rollerblading","Kolečkové brusle"],["Gymnastics","Gymnastika"],["Weightlifting","Vzpírání"],
+["Marathon","Maraton"],["High jump","Skok do výšky"],["Long jump","Skok daleký"],["Pole vault","Skok o tyči"],
+["Javelin throw","Hod oštěpem"],["Shot put","Vrh koulí"],["Hurdles","Překážkový běh"],["Rock climbing","Horolezectví"],
+["Bowling","Bowling"],["Darts","Šipky"],["Billiards","Kulečník"],["Chess","Šachy"],["Horse riding","Jízda na koni"],
+["Hiking","Turistika"],["Camping","Kempování"],["Knitting","Pletení"],["Sewing","Šití"],["Gardening","Zahradničení"],
+["Painting","Malování"],["Photography","Fotografování"],["Pottery","Hrnčířství"],["Baking","Pečení"],
+["Birdwatching","Pozorování ptáků"],["Origami","Origami"],["Playing video games","Hraní videoher"],
+["Mushroom picking","Houbaření"],["Tai chi","Tai-či"],["Trampolining","Skákání na trampolíně"],["Paintball","Paintball"]
+];
+
+const PEOPLE = [
+["Albert Einstein"],["Leonardo da Vinci"],["Napoleon","Napoleon Bonaparte"],["Cleopatra","Kleopatra"],["Julius Caesar","Julius Caesar"],
+["Mozart","Wolfgang Amadeus Mozart"],["Ludwig van Beethoven"],["William Shakespeare"],["Pablo Picasso"],
+["Vincent van Gogh"],["Marie Curie","Marie Curie-Skłodowská"],["Isaac Newton"],["Charles Darwin"],["Nikola Tesla"],
+["Steve Jobs"],["Elon Musk"],["Bill Gates"],["Mark Zuckerberg"],["Michael Jackson"],["Elvis Presley"],["Freddie Mercury"],
+["Madonna"],["Beyoncé"],["Taylor Swift"],["Lady Gaga"],["Rihanna"],["Shakira"],["The Beatles","Beatles"],["Bob Marley"],
+["Louis Armstrong"],["Charlie Chaplin"],["Marilyn Monroe"],["Audrey Hepburn"],["Arnold Schwarzenegger"],["Sylvester Stallone"],
+["Bruce Lee"],["Jackie Chan"],["Tom Cruise"],["Brad Pitt"],["Johnny Depp"],["Leonardo DiCaprio"],["Will Smith"],
+["Jim Carrey"],["Mr. Bean","Mr. Bean"],["Robin Williams"],["Morgan Freeman"],["Harrison Ford"],["Keanu Reeves"],
+["Angelina Jolie"],["Julia Roberts"],["Scarlett Johansson"],["Emma Watson"],["Daniel Radcliffe"],["Walt Disney"],
+["Steven Spielberg"],["Alfred Hitchcock"],["Muhammad Ali"],["Lionel Messi"],["Cristiano Ronaldo"],["Diego Maradona"],
+["Pelé"],["Michael Jordan"],["Usain Bolt"],["Serena Williams"],["Roger Federer"],["Novak Djokovic"],["Tiger Woods"],
+["Mike Tyson"],["Michael Phelps"],["Mahatma Gandhi"],["Nelson Mandela"],["Martin Luther King Jr."],["Abraham Lincoln"],
+["Winston Churchill"],["Queen Elizabeth II","Královna Alžběta II."],["King Charles III","Král Karel III."],
+["Princess Diana","Princezna Diana"],["Pope Francis","Papež František"],["Mother Teresa","Matka Tereza"],
+["Joan of Arc","Jana z Arku"],["Christopher Columbus","Kryštof Kolumbus"],["Neil Armstrong"],["Yuri Gagarin","Jurij Gagarin"],
+["Santa Claus","Santa Claus"],["James Bond"],["Darth Vader"],["Mickey Mouse","Myšák Mickey"],["Donald Duck","Kačer Donald"],
+["Dracula","Drákula"],["Frankenstein"],["Pippi Longstocking","Pipi Dlouhá punčocha"]
+];
+const PEOPLE_CZ = [
+"Karel Gott","Václav Havel","Jaromír Jágr","Petra Kvitová","Emil Zátopek","Věra Čáslavská","Božena Němcová","Karel Čapek",
+"T. G. Masaryk","Karel IV.","Jan Werich","Jára Cimrman","Dominik Hašek","Martina Navrátilová","Petr Čech","Ester Ledecká",
+"Jan Hus","Jan Amos Komenský","Bedřich Smetana","Antonín Dvořák","Alfons Mucha","Lucie Bílá","Krteček","Rumcajs","Pat a Mat"
+];
+
+const mk = (arr, deck, only) => arr.map(m => {
+  const a = Array.isArray(m) ? m : [m];
+  return {en: a[0], cs: a[1] || a[0], deck, only};
+});
+const MOVIES = [].concat(                                  // every card; "MOVIES" kept as the historical name
+  mk(HITS, "h"), mk(FAMILY, "f"), mk(CZECH, "c"),
+  mk(ANIMALS, "a"), mk(ACTIONS, "t"), mk(JOBS, "j"), mk(FOOD, "d"), mk(SPORTS, "s"),
+  mk(PEOPLE, "p"), mk(PEOPLE_CZ, "p", "cs")                // Czech personalities only show in the Czech UI
+);
+const DECKS = ["h", "f", "c", "a", "t", "j", "d", "s", "p"];
+const DECK_ICON = {h: "🎬", f: "🧸", c: "🎞️", a: "🐾", t: "🏃", j: "👷", d: "🍕", s: "⚽", p: "⭐"};
+const KIND = {h: "movie", f: "movie", c: "movie", a: "animal", t: "action", j: "job", d: "food", s: "sport", p: "person"};
+const keyOf = m => m.deck + ":" + m.en;
+const TIMES = [[30, "30 s"], [60, "1 min"], [90, "1:30"], [120, "2 min"]];
+const TEAM_COLORS = ["#ffc940", "#5db7ff", "#ff7eb6", "#7be495"];
+
+/* ---------- Texts ---------- */
+const TEXT = {
+  en: {
+    title: "Charades",
+    tagline: "One describes or acts it out, the rest guess. Beat the clock!",
+    how1: "Pick who describes and hand them the device.",
+    how2: "They act it out or describe it — without saying the words on the card.",
+    how3: "Got it? Tap Guessed. Stuck? Skip it.",
+    timer: "Timer", teams: "Teams", decks: "Categories", scores: "Scores",
+    deck_h: "World hits", deck_f: "Family & animated", deck_c: "Czech classics",
+    deck_a: "Animals", deck_t: "Actions", deck_j: "Jobs", deck_d: "Food & drink",
+    deck_s: "Sports & hobbies", deck_p: "Famous people",
+    kind_movie: "Movie", kind_animal: "Animal", kind_action: "Action", kind_job: "Job",
+    kind_food: "Food or drink", kind_sport: "Sport or hobby", kind_person: "Person",
+    pool: "{0} cards in play",
+    start: "Start game", startNext: "Next round", reset: "Reset scores",
+    soundOn: "🔊 Sound on", soundOff: "🔇 Sound off",
+    team: "Team {0}", readySolo: "Get ready",
+    readyHint: "Hand the device to whoever describes. Guessers must not see the screen!",
+    go: "We're ready", back: "Back",
+    skip: "Skip", guessed: "Guessed!",
+    paused: "Paused", resume: "Resume", endRound: "End round",
+    timeUp: "Time's up!", roundScore: "Guessed:",
+    fixHint: "Tap a title to correct it.",
+    nextTeam: "Next: {0}", nextRound: "Next round", menu: "Menu"
+  },
+  cs: {
+    title: "Hádej, co to je",
+    tagline: "Jeden popisuje nebo předvádí, ostatní hádají. Stihněte toho co nejvíc!",
+    how1: "Vyberte, kdo bude popisovat, a dejte mu zařízení.",
+    how2: "Popisuje nebo předvádí – slova z karty ale říct nesmí.",
+    how3: "Uhodnuto? Ťukněte na Uhodnuto. Nejde to? Přeskočte.",
+    timer: "Časovač", teams: "Týmy", decks: "Kategorie", scores: "Skóre",
+    deck_h: "Světové hity", deck_f: "Rodinné a animované", deck_c: "Česká klasika",
+    deck_a: "Zvířata", deck_t: "Činnosti", deck_j: "Povolání", deck_d: "Jídlo a pití",
+    deck_s: "Sporty a koníčky", deck_p: "Osobnosti",
+    kind_movie: "Film", kind_animal: "Zvíře", kind_action: "Činnost", kind_job: "Povolání",
+    kind_food: "Jídlo nebo pití", kind_sport: "Sport nebo koníček", kind_person: "Osobnost",
+    pool: "Ve hře je {0} karet",
+    start: "Začít hru", startNext: "Další kolo", reset: "Vynulovat skóre",
+    soundOn: "🔊 Zvuk zapnutý", soundOff: "🔇 Zvuk vypnutý",
+    team: "Tým {0}", readySolo: "Připravte se",
+    readyHint: "Předejte zařízení tomu, kdo popisuje. Hádající nesmí vidět obrazovku!",
+    go: "Můžeme začít", back: "Zpět",
+    skip: "Přeskočit", guessed: "Uhodnuto!",
+    paused: "Pozastaveno", resume: "Pokračovat", endRound: "Ukončit kolo",
+    timeUp: "Čas vypršel!", roundScore: "Uhodnuto:",
+    fixHint: "Ťuknutím na název výsledek opravíte.",
+    nextTeam: "Další: {0}", nextRound: "Další kolo", menu: "Menu"
+  }
+};
+
+/* ---------- State ---------- */
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }
+};
+
+const saved = store.get("gf.state", {}) || {};
+const S = {
+  lang: saved.lang === "cs" || saved.lang === "en" ? saved.lang : (/^(cs|sk)/i.test(navigator.language || "") ? "cs" : "en"),
+  secs: TIMES.some(t => t[0] === saved.secs) ? saved.secs : 60,
+  teams: [1, 2, 3, 4].includes(saved.teams) ? saved.teams : 2,
+  decks: Array.isArray(saved.decks) ? saved.decks.filter(d => DECKS.includes(d)) : [],
+  sound: saved.sound !== false,
+  scores: Array.isArray(saved.scores) && saved.scores.length === 4 ? saved.scores.map(n => +n || 0) : [0, 0, 0, 0],
+  turn: 0
+};
+if (!S.decks.length) S.decks = S.lang === "cs" ? ["h", "f", "c"] : ["h", "f"];
+S.turn = Number.isInteger(saved.turn) && saved.turn >= 0 && saved.turn < S.teams ? saved.turn : 0;
+
+const seen = new Set(store.get("gf.seen", []) || []);
+const save = () => store.set("gf.state", S);
+const t = (k, a) => (TEXT[S.lang][k] || k).replace("{0}", a);
+const teamName = i => t("team", i + 1);
+const titleOf = m => S.lang === "cs" ? m.cs : m.en;
+const fmt = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+
+let R = null;          // current round
+let cdTimer = null;    // 3-2-1 countdown
+
+/* ---------- Sound, vibration, wake lock ---------- */
+let ac = null;
+function beep(freq, dur, type, vol) {
+  if (!S.sound) return;
+  try {
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === "suspended") ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain(), now = ac.currentTime;
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.18, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(now); o.stop(now + dur);
+  } catch (e) { /* no audio */ }
+}
+let wl = null;
+async function wake() { try { if (navigator.wakeLock) wl = await navigator.wakeLock.request("screen"); } catch (e) { /* denied */ } }
+function unwake() { try { if (wl) wl.release(); } catch (e) { /* ignore */ } wl = null; }
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && R && !R.over) wake();
+});
+
+/* ---------- Screens ---------- */
+function show(id) {
+  ["home", "ready", "play", "done"].forEach(s => { $(s).hidden = s !== id; });
+  window.scrollTo(0, 0);
+}
+function applyTexts() {
+  document.documentElement.lang = S.lang;
+  document.title = t("title");
+  document.querySelectorAll("[data-t]").forEach(el => { el.textContent = t(el.dataset.t); });
+}
+function seg(el, opts, cur, onPick) {
+  el.textContent = "";
+  opts.forEach(([v, label]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label;
+    b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(v === cur));
+    b.onclick = () => onPick(v);
+    el.appendChild(b);
+  });
+}
+function board(el, current) {
+  el.textContent = "";
+  for (let i = 0; i < S.teams; i++) {
+    const li = document.createElement("li");
+    if (i === current) li.className = "now";
+    const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = TEAM_COLORS[i];
+    const name = document.createElement("span"); name.className = "name"; name.textContent = teamName(i);
+    const pts = document.createElement("span"); pts.className = "pts"; pts.textContent = S.scores[i];
+    li.append(dot, name, pts); el.appendChild(li);
+  }
+}
+const inLang = m => !m.only || m.only === S.lang;
+const pool = () => MOVIES.filter(m => S.decks.includes(m.deck) && inLang(m));
+
+function renderHome() {
+  applyTexts();
+  $("langBtn").textContent = S.lang === "cs" ? "🌐 English" : "🌐 Česky";
+  $("soundBtn").textContent = t(S.sound ? "soundOn" : "soundOff");
+  $("soundBtn").setAttribute("aria-pressed", String(S.sound));
+  seg($("timeSeg"), TIMES, S.secs, v => { S.secs = v; save(); renderHome(); });
+  seg($("teamSeg"), [1, 2, 3, 4].map(n => [n, String(n)]), S.teams, v => {
+    S.teams = v; if (S.turn >= v) S.turn = 0; save(); renderHome();
+  });
+  const chips = $("deckChips"); chips.textContent = "";
+  DECKS.forEach(d => {
+    const on = S.decks.includes(d);
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.setAttribute("aria-pressed", String(on));
+    b.textContent = DECK_ICON[d] + " " + t("deck_" + d);
+    const n = document.createElement("small"); n.textContent = MOVIES.filter(m => m.deck === d && inLang(m)).length;
+    b.appendChild(n);
+    b.onclick = () => {
+      if (on && S.decks.length === 1) return;            // keep at least one deck
+      S.decks = on ? S.decks.filter(x => x !== d) : S.decks.concat(d);
+      save(); renderHome();
+    };
+    chips.appendChild(b);
+  });
+  $("poolNote").textContent = t("pool", pool().length);
+  const playing = S.scores.some(n => n > 0);
+  $("homeBoardWrap").hidden = !(playing && S.teams > 1);
+  if (playing) board($("homeBoard"), S.turn);
+  $("resetBtn").hidden = !playing;
+  $("startBtn").textContent = t(playing ? "startNext" : "start");
+}
+
+/* ---------- Round ---------- */
+function toReady() {
+  clearInterval(cdTimer);
+  $("readyTeam").textContent = S.teams > 1 ? teamName(S.turn) : t("readySolo");
+  $("readyTeam").style.color = S.teams > 1 ? TEAM_COLORS[S.turn] : "";
+  $("readyTeam").hidden = false; $("readyHint").hidden = false;
+  $("count").hidden = true; $("goBtn").hidden = false; $("backBtn").hidden = false;
+  show("ready");
+}
+function countdown() {
+  let n = 3;
+  $("goBtn").hidden = true; $("readyHint").hidden = true; $("backBtn").hidden = true;
+  $("count").hidden = false; $("count").textContent = n;
+  beep(520, 0.12);
+  clearInterval(cdTimer);
+  cdTimer = setInterval(() => {
+    n--;
+    if (n > 0) { $("count").textContent = n; beep(520, 0.12); }
+    else { clearInterval(cdTimer); startRound(); }
+  }, 800);
+}
+function draw() {
+  let p = pool().filter(m => !seen.has(keyOf(m)));
+  if (!p.length) {                                       // deck used up: start over, minus this round
+    seen.clear(); R.items.forEach(i => seen.add(keyOf(i.m)));
+    p = pool().filter(m => !seen.has(keyOf(m)));
+    if (!p.length) { seen.clear(); p = pool(); }
+  }
+  const m = p[Math.floor(Math.random() * p.length)];
+  seen.add(keyOf(m)); store.set("gf.seen", Array.from(seen));
+  return m;
+}
+function nextCard() {
+  R.cur = draw();
+  const el = $("movie");
+  el.textContent = titleOf(R.cur);
+  $("kind").textContent = t("kind_" + KIND[R.cur.deck]);
+  el.classList.remove("in"); void el.offsetWidth; el.classList.add("in");
+}
+function startRound() {
+  const total = S.secs * 1000;
+  R = { items: [], cur: null, base: S.scores[S.turn], total, deadline: Date.now() + total,
+        left: total, paused: false, over: false, lockUntil: 0, lastS: -1, timer: null };
+  $("gotN").textContent = "0";
+  $("playWho").textContent = S.teams > 1 ? teamName(S.turn) : "";
+  $("play").classList.remove("low");
+  $("veil").hidden = true;
+  show("play");
+  nextCard(); wake(); beep(880, 0.25);
+  R.timer = setInterval(tick, 100); tick();
+}
+function tick() {
+  if (!R || R.paused || R.over) return;
+  const left = Math.max(0, R.deadline - Date.now());
+  const s = Math.ceil(left / 1000);
+  if (s !== R.lastS) {
+    R.lastS = s;
+    $("clock").textContent = fmt(s);
+    $("play").classList.toggle("low", s <= 10);
+    if (s <= 5 && s > 0) beep(660, 0.09, "square", 0.08);
+  }
+  $("barFill").style.transform = "scaleX(" + (left / R.total) + ")";
+  if (left <= 0) endRound();
+}
+function act(ok) {
+  if (!R || R.paused || R.over) return;
+  const now = Date.now();
+  if (now < R.lockUntil) return;                         // guard against double taps
+  R.lockUntil = now + 250;
+  R.items.push({ m: R.cur, ok });
+  if (ok) { beep(1040, 0.12); $("gotN").textContent = R.items.filter(i => i.ok).length; }
+  else beep(300, 0.1, "triangle", 0.12);
+  nextCard();
+}
+function pause() {
+  if (!R || R.paused || R.over) return;
+  R.paused = true; R.left = Math.max(0, R.deadline - Date.now());
+  clearInterval(R.timer);
+  $("veil").hidden = false;
+}
+function resume() {
+  if (!R || !R.paused || R.over) return;
+  R.paused = false; R.deadline = Date.now() + R.left; R.lastS = -1;
+  $("veil").hidden = true;
+  R.timer = setInterval(tick, 100); tick();
+}
+function endRound() {
+  if (!R || R.over) return;
+  R.over = true; clearInterval(R.timer); unwake();
+  if (R.cur) R.items.push({ m: R.cur, ok: null });       // card on screen when time ran out
+  beep(220, 0.7, "sawtooth", 0.16);
+  try { if (navigator.vibrate) navigator.vibrate([200, 80, 200]); } catch (e) { /* ignore */ }
+  renderDone(); show("done");
+}
+function renderDone() {
+  const n = R.items.filter(i => i.ok === true).length;
+  S.scores[S.turn] = R.base + n; save();
+  $("doneN").textContent = n;
+  $("doneWho").textContent = S.teams > 1 ? teamName(S.turn) + " ·" : "";
+  const ul = $("resList"); ul.textContent = "";
+  R.items.forEach(it => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.type = "button"; b.className = it.ok ? "yes" : "no"; b.setAttribute("aria-pressed", String(!!it.ok));
+    const mark = document.createElement("span"); mark.className = "mark";
+    mark.textContent = it.ok ? "✓" : it.ok === null ? "⏱" : "✕";
+    const name = document.createElement("span"); name.textContent = titleOf(it.m);
+    b.append(mark, name);
+    b.onclick = () => { it.ok = !it.ok; renderDone(); };
+    li.appendChild(b); ul.appendChild(li);
+  });
+  $("doneBoardWrap").hidden = S.teams < 2;
+  if (S.teams > 1) board($("doneBoard"), S.turn);
+  const nxt = (S.turn + 1) % S.teams;
+  $("nextBtn").textContent = S.teams > 1 ? t("nextTeam", teamName(nxt)) : t("nextRound");
+}
+function closeRound() { S.turn = (S.turn + 1) % S.teams; save(); R = null; }
+
+/* ---------- Wiring ---------- */
+const tap = (id, fn) => $(id).addEventListener("click", e => { e.currentTarget.blur(); fn(e); });
+tap("langBtn", () => { S.lang = S.lang === "cs" ? "en" : "cs"; save(); renderHome(); });
+tap("soundBtn", () => { S.sound = !S.sound; save(); renderHome(); if (S.sound) beep(880, 0.1); });
+tap("startBtn", toReady);
+tap("resetBtn", () => { S.scores = [0, 0, 0, 0]; S.turn = 0; save(); renderHome(); });
+tap("goBtn", countdown);
+tap("backBtn", () => { clearInterval(cdTimer); renderHome(); show("home"); });
+tap("okBtn", () => act(true));
+tap("skipBtn", () => act(false));
+tap("pauseBtn", pause);
+tap("resumeBtn", resume);
+tap("endBtn", () => { $("veil").hidden = true; endRound(); });
+tap("nextBtn", () => { closeRound(); toReady(); });
+tap("menuBtn", () => { closeRound(); renderHome(); show("home"); });
+
+document.addEventListener("keydown", e => {
+  if (e.repeat || $("play").hidden || !R) return;
+  const k = e.key;
+  if (R.paused) { if (k === "Escape" || k === "p" || k === "P") resume(); return; }
+  if (k === "Enter" || k === " " || k === "ArrowRight") { e.preventDefault(); act(true); }
+  else if (k === "ArrowLeft" || k === "s" || k === "S") { e.preventDefault(); act(false); }
+  else if (k === "Escape" || k === "p" || k === "P") pause();
+});
+
+renderHome();
+})();
+</script>
+</body>
+</html>
